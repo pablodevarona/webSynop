@@ -1,5 +1,4 @@
 import streamlit as st
-from utils.shared_functions import degrees_to_direction
 
 st.set_page_config(page_title='Monitor de Observaciones  de Superficie')
 st.markdown(
