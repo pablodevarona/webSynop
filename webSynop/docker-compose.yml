@@ -1,0 +1,6 @@
+services:
+  streamlit:
+    build: .
+    environment:
+      PYTHONUNBUFFERED: 1
+    restart: always
