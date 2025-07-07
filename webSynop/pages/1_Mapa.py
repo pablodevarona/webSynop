@@ -367,7 +367,8 @@ if st.button('Cargar los Datos'):
             layers=[point_layer, text_layer],
             initial_view_state=view_state,
             tooltip={"html": tooltip_html, "style": {"backgroundColor": "yellow", "color": "black"}},
-            map_style='mapbox://styles/mapbox/light-v9'
+            map_style='light'
+            #map_style='mapbox://styles/mapbox/light-v9'
         )
 
         st.pydeck_chart(deck)

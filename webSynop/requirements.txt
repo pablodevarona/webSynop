@@ -1,0 +1,9 @@
+plotly
+pandas
+streamlit
+pyodbc
+pydeck
+windrose
+matplotlib
+numpy
+scipy
