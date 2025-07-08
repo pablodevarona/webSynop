@@ -229,10 +229,6 @@ if st.button('Cargar los Datos'):
         else:
             st.session_state['filtered_df'] = st.session_state['df'][['OMM', 'Nombre', 'Reg', 'Prov', 'Fecha', st.session_state['data_var'], st.session_state['data_flag']]]    
 
-        # m/s to km/h conversion
-        if (st.session_state['data_var'] == 'ff' or st.session_state['data_var_2'] == 'ff'):
-            st.session_state['filtered_df'].loc[:, 'ff'] *= 3.6
-
         # Filter the DataFrame by selected_region
         if st.session_state['selected_region'] == 'Cuba':
             st.session_state['filtered_df'] = st.session_state['filtered_df'][((st.session_state['filtered_df']['Reg'] == 'OCC') | (st.session_state['filtered_df']['Reg'] == 'CEN') | (st.session_state['filtered_df']['Reg'] == 'OTE')) ]
