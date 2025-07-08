@@ -150,6 +150,9 @@ SELECT Observations.station_id,
        Observations.surface_wind_speed_flag,
        Observations.surface_wind_direction_calm,
        Observations.surface_wind_direction,
+       Observations.highest_gust_speed,
+       Observations.highest_gust_speed_flag,
+       Observations.highest_gust_direction,       
        Observations.cloud_cover
 FROM Observations
 INNER JOIN Stations ON Observations.station_id = Stations.station_id
@@ -165,6 +168,19 @@ if st.button('Cargar los Datos'):
                 conn, 
                 params=[st.session_state['start_date'], st.session_state['end_date']]
             )
+
+        if 'df' in st.session_state:
+            # Express wind speed in km/h
+            if 'surface_wind_speed' in st.session_state['df']:
+                if pd.api.types.is_numeric_dtype(st.session_state['df']['surface_wind_speed']):
+                    st.session_state['df'].loc[:, 'surface_wind_speed'] = (
+                        st.session_state['df'].loc[:, 'surface_wind_speed'] * 3.6
+                    ).round(1)
+            if 'highest_gust_speed' in st.session_state['df']:
+                if pd.api.types.is_numeric_dtype(st.session_state['df']['highest_gust_speed']):
+                    st.session_state['df'].loc[:, 'highest_gust_speed'] = (
+                        st.session_state['df'].loc[:, 'highest_gust_speed'] * 3.6
+                    ).round(1)
 
         # Rename the DataFrame columns
         st.session_state['df'].columns = [
@@ -193,6 +209,9 @@ if st.button('Cargar los Datos'):
                             'ffq',
                             'calma',
                             'dd',
+                            'fx',
+                            'fxq',
+                            'fxdd',                            
                             'N'
                             ]
 
@@ -276,7 +295,6 @@ if st.button('Cargar los Datos'):
         if st.session_state['selected_graph'] == 'Rosa de los Vientos':
             st.session_state['missing_data'] = st.session_state['filtered_df']['ff'].isna().sum()
             st.session_state['filtered_df_valid'] = st.session_state['filtered_df'][(st.session_state['filtered_df']['ffq'] <= 4)]
-            st.session_state['filtered_df_valid'].loc[:, 'ff'] = st.session_state['filtered_df'].loc[:, 'ff'] * 3.6
             wind_data = len(st.session_state['filtered_df_valid'])
             st.session_state['calm'] = st.session_state['filtered_df_valid']['calma'].sum()
             st.session_state['filtered_df_valid'] = st.session_state['filtered_df_valid'].dropna()
@@ -569,73 +587,32 @@ if st.button('Cargar los Datos'):
                     disabled=True
                 )
 
-        with st.expander('Informe de Valores Extremos'):
-            if st.session_state['selected_graph'] == 'Rosa de los Vientos':
-                st.session_state['data_var'] = 'ff'
-                st.session_state['data_flag'] = 'ffq'
-                st.session_state['data_unit'] = 'km/h'
-                st.session_state['data_name'] = 'Velocidad del viento'    
+        if (st.session_state['data_var'] != 'dd' and st.session_state['data_var'] != 'N'):
 
-            if st.session_state['data_var'] in ['T', 'Tn', 'Tx', 'Pnmm', 'dP3', 'dP24', 'Td', 'HR', 'IC']:
+            with st.expander('Informe de Valores Extremos'):
+                if st.session_state['selected_graph'] == 'Rosa de los Vientos':
+                    st.session_state['data_var'] = 'ff'
+                    st.session_state['data_flag'] = 'ffq'
+                    st.session_state['data_unit'] = 'km/h'
+                    st.session_state['data_name'] = 'Velocidad del viento'    
 
-                report = statistical_report(
-                    df=st.session_state['filtered_df_valid'],
-                    var=st.session_state['data_var'],
-                    var_str=st.session_state['data_name'],
-                    unit_str=st.session_state['data_unit'],
-                    nulled_count_var=st.session_state['invalid_data']
-                )
-
-            elif st.session_state['data_var'] in ['R3', 'R6', 'R24', 'ff', 'fx']:
-                
-                report = statistical_report(
-                            df=st.session_state['filtered_df_valid'],
-                            var=st.session_state['data_var'],
-                            var_str=st.session_state['data_name'],
-                            unit_str=st.session_state['data_unit'],
-                            nulled_count_var=st.session_state['invalid_data'],
-                            find_min=False
-                        )
-
-            # Display nulled values info if exists
-            if report['nulled_info']:
-                st.info(report['nulled_info'])
-
-            # Display min values if calculated
-            if report['min'] is not None:
-                min_value, min_stations_dates = report['min']
-                if min_value is not None and not np.isnan(min_value):
-                    st.write(f"Mínimo de {report['var_str']}: {min_value} {report['unit_str']} observado en:")
-                    for station, date in min_stations_dates:
-                        st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
-
-            # Display max values if calculated
-            if report['max'] is not None:
-                max_value, max_stations_dates = report['max']
-                if max_value is not None and not np.isnan(max_value):
-                    st.write(f"Máximo de {report['var_str']}: {max_value} {report['unit_str']} observado en:")
-                    for station, date in max_stations_dates:
-                        st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
-
-            if st.session_state['selected_graph'] in ['Dispersión', 'Línea (2 variables)']:
-
-                if st.session_state['data_var_2'] in ['T', 'Tn', 'Tx', 'Pnmm', 'dP3', 'dP24', 'Td', 'HR', 'IC']:
+                if st.session_state['data_var'] in ['T', 'Tn', 'Tx', 'Pnmm', 'dP3', 'dP24', 'Td', 'HR', 'IC']:
 
                     report = statistical_report(
                         df=st.session_state['filtered_df_valid'],
-                        var=st.session_state['data_var_2'],
-                        var_str=st.session_state['data_name_2'],
-                        unit_str=st.session_state['data_unit_2'],
+                        var=st.session_state['data_var'],
+                        var_str=st.session_state['data_name'],
+                        unit_str=st.session_state['data_unit'],
                         nulled_count_var=st.session_state['invalid_data']
                     )
-            
-                elif st.session_state['data_var_2'] in ['R3', 'R6', 'R24', 'ff', 'fx']:
+
+                elif st.session_state['data_var'] in ['R3', 'R6', 'R24', 'ff', 'fx']:
                     
                     report = statistical_report(
                                 df=st.session_state['filtered_df_valid'],
-                                var=st.session_state['data_var_2'],
-                                var_str=st.session_state['data_name_2'],
-                                unit_str=st.session_state['data_unit_2'],
+                                var=st.session_state['data_var'],
+                                var_str=st.session_state['data_name'],
+                                unit_str=st.session_state['data_unit'],
                                 nulled_count_var=st.session_state['invalid_data'],
                                 find_min=False
                             )
@@ -660,6 +637,48 @@ if st.button('Cargar los Datos'):
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
 
+                if st.session_state['selected_graph'] in ['Dispersión', 'Línea (2 variables)']:
+
+                    if st.session_state['data_var_2'] in ['T', 'Tn', 'Tx', 'Pnmm', 'dP3', 'dP24', 'Td', 'HR', 'IC']:
+
+                        report = statistical_report(
+                            df=st.session_state['filtered_df_valid'],
+                            var=st.session_state['data_var_2'],
+                            var_str=st.session_state['data_name_2'],
+                            unit_str=st.session_state['data_unit_2'],
+                            nulled_count_var=st.session_state['invalid_data']
+                        )
+                
+                    elif st.session_state['data_var_2'] in ['R3', 'R6', 'R24', 'ff', 'fx']:
+                        
+                        report = statistical_report(
+                                    df=st.session_state['filtered_df_valid'],
+                                    var=st.session_state['data_var_2'],
+                                    var_str=st.session_state['data_name_2'],
+                                    unit_str=st.session_state['data_unit_2'],
+                                    nulled_count_var=st.session_state['invalid_data'],
+                                    find_min=False
+                                )
+
+                    # Display nulled values info if exists
+                    if report['nulled_info']:
+                        st.info(report['nulled_info'])
+
+                    # Display min values if calculated
+                    if report['min'] is not None:
+                        min_value, min_stations_dates = report['min']
+                        if min_value is not None and not np.isnan(min_value):
+                            st.write(f"Mínimo de {report['var_str']}: {min_value} {report['unit_str']} observado en:")
+                            for station, date in min_stations_dates:
+                                st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
+
+                    # Display max values if calculated
+                    if report['max'] is not None:
+                        max_value, max_stations_dates = report['max']
+                        if max_value is not None and not np.isnan(max_value):
+                            st.write(f"Máximo de {report['var_str']}: {max_value} {report['unit_str']} observado en:")
+                            for station, date in max_stations_dates:
+                                st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
 
     except Exception as e:
         st.error(f"Error al cargar los datos: {str(e)}")
