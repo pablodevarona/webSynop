@@ -28,14 +28,14 @@ graphDic = {'Barras' : ['1 hora', '08:00-19:00', '20:00-07:00', '24 horas'], 'Di
 variableDic = {'Temperatura del aire' : ['T', 'Tq', '°C'], 'Temperatura mínima del aire' : ['Tn', 'Tnq', '°C'], 'Temperatura máxima del aire' : ['Tx', 'Txq', '°C'],
                'Temperatura del punto de rocío' : ['Td', 'Tdq', '°C'], 'Humedad Relativa' : ['HR', 'HRq', '%'], 'Índice de calor NOAA' : ['IC', 'ICq', '°C'],
                'Presión al nivel medio del mar' : ['Pnmm', 'Pnmmq', 'hPa'], 'Cambio de presión en 3h' : ['dP3', 'dP3q', 'hPa'], 'Cambio de presión en 24h' : ['dP24', 'dP24q', 'hPa'],
-               'Lluvia en 1(3) hora(s)' : ['R3', 'R3q', 'mm'], 'Lluvia en 6 horas' : ['R6', 'R6q', 'mm'], 'Lluvia en 24 horas' : ['R24', 'R24q', 'mm'], 'Tiempo' : ['ww', 'wwq', 'código'],
+               'Lluvia en 1(3) hora(s)' : ['R3', 'R3q', 'mm'], 'Lluvia en 6 horas' : ['R6', 'R6q', 'mm'], 'Lluvia en 24 horas' : ['R24', 'R24q', 'mm'],
                'Velocidad del viento' : ['ff', 'ffq', 'km/h'], 'Dirección del viento' : ['dd', 'ddq', 'rumbos'], 'Racha máxima' : ['fx', 'fxq', 'km/h'], 'Nubosidad' : ['N', 'Nq', 'octas']
             }
 
 variableDicInv = {'T': 'Temperatura del aire', 'Tn': 'Temperatura mínima del aire', 'Tx': 'Temperatura máxima del aire',
                    'Td': 'Temperatura del punto de rocío', 'HR' : 'Humedad Relativa', 'IC': 'Índice de calor',
                    'Pnmm' : 'Presión al nivel medio del mar', 'dP3' : 'Cambio de presión en 3h', 'dP24' : 'Cambio de presión en 24h',
-                   'R3' : 'Lluvia en 1(3) hora(s)', 'R6' : 'Lluvia en 6 horas', 'R24' : 'Lluvia en 24 horas', 'ww' : 'Tiempo',
+                   'R3' : 'Lluvia en 1(3) hora(s)', 'R6' : 'Lluvia en 6 horas', 'R24' : 'Lluvia en 24 horas',
                    'ff' : 'Velocidad del viento', 'dd' : 'Dirección del viento', 'fx' : 'Racha máxima', 'N' : 'Nubosidad'
                  }
 
@@ -96,6 +96,8 @@ if st.session_state['selected_graph'] != 'Rosa de los Vientos':
         st.session_state['data_flag_2'] = variableDic[selected_var_2][1]
         st.session_state['data_unit_2'] = variableDic[selected_var_2][2]
         st.session_state['data_name_2'] = variableDicInv[st.session_state['data_var_2']]
+else:
+    st.session_state['data_name'] = 'Velocidad y Dirección del viento'
 
 # Region or province selection
 st.session_state['selected_region'] = st.sidebar.selectbox('Seleccione la Región/Provincia', list(stationDic_1.keys()), key=None)
@@ -137,11 +139,16 @@ SELECT Observations.station_id,
        Observations.maximum_temperature,
        Observations.maximum_temperature_flag,
        Observations.sea_level_pressure,
+       Observations.pressure_tendency,
+       Observations.pressure_change_3h,
+       Observations.pressure_change_24h,
        Observations.dewpoint_temperature,
        Observations.dewpoint_temperature_flag,
        Observations.relative_humidity,
        Observations.relative_humidity_flag,
        Observations.heat_index,
+       Observations.precipitation_s1,
+       Observations.precipitation_s1_flag,       
        Observations.precipitation_s3,
        Observations.precipitation_s3_flag,
        Observations.precipitation_24h,
@@ -181,6 +188,16 @@ if st.button('Cargar los Datos'):
                     st.session_state['df'].loc[:, 'highest_gust_speed'] = (
                         st.session_state['df'].loc[:, 'highest_gust_speed'] * 3.6
                     ).round(1)
+            # Conditional sign flip (only if all required columns exist and are numeric and pressure_tendency > 5)
+            df = st.session_state['df']
+            cols_required = ['pressure_tendency', 'pressure_change_3h']
+            # Check if all required columns exist and are numeric
+            if all(col in df.columns for col in cols_required):
+                if all(pd.api.types.is_numeric_dtype(df[col]) for col in cols_required):
+                    # Apply the operation safely
+                    mask = df['pressure_tendency'] > 5
+                    df.loc[mask, 'pressure_change_3h'] = df.loc[mask, 'pressure_change_3h'] * -1
+                    st.session_state['df'] = df  # Update session state
 
         # Rename the DataFrame columns
         st.session_state['df'].columns = [
@@ -196,13 +213,18 @@ if st.button('Cargar los Datos'):
                             'Tx',
                             'Txq',
                             'Pnmm',
+                            'a',
+                            'dP3',
+                            'dP24',
                             'Td',
                             'Tdq',
                             'HR',
                             'HRq',
                             'IC',
-                            'Rs3',
-                            'Rs3q',
+                            'R6',
+                            'R6q',                            
+                            'R3',
+                            'R3q',
                             'R24',
                             'R24q',
                             'ff',
@@ -217,6 +239,8 @@ if st.button('Cargar los Datos'):
 
         # insert flag columns and make them zero to make easier further processing
         st.session_state['df']['Pnmmq'] = 0
+        st.session_state['df']['dP3q'] = 0
+        st.session_state['df']['dP24q'] = 0
         st.session_state['df']['ICq'] = 0
         st.session_state['df']['ddq'] = 0
         st.session_state['df']['Nq'] = 0
@@ -291,16 +315,16 @@ if st.button('Cargar los Datos'):
         if st.session_state['selected_graph'] == 'Rosa de los Vientos':
             st.session_state['missing_data'] = st.session_state['filtered_df']['ff'].isna().sum()
             st.session_state['filtered_df_valid'] = st.session_state['filtered_df'][(st.session_state['filtered_df']['ffq'] <= 4)]
+            st.session_state['invalid_data'] = len(st.session_state['filtered_df'][(st.session_state['filtered_df']['ffq'] > 4)])
             wind_data = len(st.session_state['filtered_df_valid'])
             st.session_state['calm'] = st.session_state['filtered_df_valid']['calma'].sum()
             st.session_state['filtered_df_valid'] = st.session_state['filtered_df_valid'].dropna()
             wind_direction = st.session_state['filtered_df_valid']['dd'].tolist()
             wind_speed = st.session_state['filtered_df_valid']['ff'].tolist()
-            st.session_state['invalid_data'] = st.session_state['all_data'] - st.session_state['missing_data'] - len(st.session_state['filtered_df_valid']) - st.session_state['calm']
         else:
             st.session_state['missing_data'] = st.session_state['filtered_df'][st.session_state['data_var']].isna().sum()
             st.session_state['filtered_df_valid'] = st.session_state['filtered_df'][st.session_state['filtered_df'][st.session_state['data_flag']] <= 4]
-            st.session_state['invalid_data'] = st.session_state['all_data'] - st.session_state['missing_data'] - len(st.session_state['filtered_df_valid'])
+            st.session_state['invalid_data'] = len( st.session_state['filtered_df'][st.session_state['filtered_df'][st.session_state['data_flag']] > 4])
             # Find out the axis title for selected_graph
             key = next((k for k, v in variableDic.items() if v[0] == st.session_state['data_var']), None)
             if st.session_state['selected_graph'] in ['Dispersión', 'Línea (2 variables)']:
