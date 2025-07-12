@@ -87,7 +87,7 @@ if selected_datetime > max_datetime:
     # Create a placeholder for the alert message
     alert_placeholder = st.empty()
     # Display an alert message
-    alert_placeholder.warning("La fecha-hora seleccionada no puede ser mayor que la mayor fecha-hora de los datos")
+    alert_placeholder.warning(f"La fecha-hora seleccionada no puede ser mayor que {max_datetime.strftime('%Y-%m-%d %H:%M')} Hora Local (sin Horario de Verano)")
     # Wait for 3 seconds before "deleting" the alert
     time_2.sleep(3)
     # Clear the alert message
