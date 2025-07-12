@@ -62,7 +62,6 @@ if max_datetime is None:
     st.error("No se pudo obtener la fecha máxima de observación")
     st.stop()  # Stop execution if no date is available
 
-st.session_state['last_observation'] = max_datetime
 try:
     max_data_year = max_datetime.year
     max_data_month = max_datetime.month
@@ -72,34 +71,36 @@ except AttributeError as e:
     st.error(f"Error al procesar la fecha: {str(e)}")
     st.stop()
 
-st.session_state['selected_hour'] = max_data_hour
+max_date = datetime(max_data_year, max_data_month, max_data_day)
 
-selected_date = st.sidebar.date_input('Seleccione la Fecha', datetime.today())
-st.session_state['year'] = selected_date.year
-st.session_state['month'] = selected_date.month
-st.session_state['day'] = selected_date.day
+selected_date = st.sidebar.date_input('Seleccione la Fecha', max_date)
+st.session_state['selected_date'] = selected_date
 
 selected_time = st.sidebar.time_input('Seleccione la Hora', time(max_data_hour, 0), step=3600)
 st.session_state['selected_hour'] = selected_time.hour
 
-obs_date = datetime(st.session_state['year'], st.session_state['month'], st.session_state['day'], st.session_state['selected_hour'], 0, 0, 0)
+selected_datetime = datetime.combine(selected_date, selected_time)
+
+if selected_datetime > max_datetime:
+    st.session_state['obs_date'] = max_datetime
+    datetime_valid = False
+    # Create a placeholder for the alert message
+    alert_placeholder = st.empty()
+    # Display an alert message
+    alert_placeholder.warning("La fecha-hora seleccionada no puede ser mayor que la mayor fecha-hora de los datos")
+    # Wait for 3 seconds before "deleting" the alert
+    time_2.sleep(3)
+    # Clear the alert message
+    alert_placeholder.empty()
+else:
+    st.session_state['obs_date'] = selected_datetime
+    datetime_valid = True
+
 selected_var = st.sidebar.selectbox('Seleccione una variable', list(variableDic.keys()))
 st.session_state['data_var'] = variableDic[selected_var][0]
 st.session_state['data_flag'] = variableDic[selected_var][1]
 st.session_state['data_unit'] = variableDic[selected_var][2]
 st.session_state['data_name'] = variableDicInv[st.session_state['data_var']]
-
-if obs_date > datetime.now():
-    # Create a placeholder for the alert message
-    alert_placeholder = st.empty()
-    # Display an alert message
-    alert_placeholder.warning("Usted ha seleccionado una fecha-hora mayor que la actual")
-    obs_date = datetime(st.session_state['year'], st.session_state['month'], st.session_state['day'], max_data_hour, 0, 0, 0)
-    st.session_state['selected_hour'] = max_data_hour
-    # Wait for 3 seconds before "deleting" the alert
-    time_2.sleep(3)
-    # Clear the alert message
-    alert_placeholder.empty()
 
 # Define the query
 query = f"""
@@ -144,13 +145,13 @@ WHERE Observations.obs_time = ?
 ORDER BY Observations.station_id
 """
 
-if st.button('Cargar los Datos'):
+if (st.button('Cargar los Datos') and datetime_valid):
     try:
         with get_connection() as conn:
             st.session_state['obs_df'] = pd.read_sql(
                 query, 
                 conn, 
-                params=(obs_date,)
+                params=[st.session_state['obs_date']]
             )
         
         if 'obs_df' in st.session_state:
@@ -247,7 +248,7 @@ if st.button('Cargar los Datos'):
         # Apply the filter
         st.session_state['merged_df'] = st.session_state['merged_df'][condition]
 
-        st.write(f"Variable {selected_var}, en {st.session_state['data_unit']} -- Fecha {st.session_state['year']}-{st.session_state['month']}-{st.session_state['day']} {st.session_state['selected_hour']}:00 Hora Local (sin Horario de Verano)")
+        st.write(f"Variable {selected_var}, en {st.session_state['data_unit']} -- Fecha {st.session_state['obs_date'].strftime('%Y-%m-%d %H:%M')} Hora Local (sin Horario de Verano)")
 
         required_columns = ['OMM', 'Nombre', 'latitude', 'longitude', 'altura', 
                         'T', 'Tn', 'Tx', 'Td', 'HR', 'IC', 'Pnmm', 'ff', 'dd',
