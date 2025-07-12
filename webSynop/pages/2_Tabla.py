@@ -26,6 +26,85 @@ selected_hours = [1, 4, 7, 10, 13, 16, 19, 22]
 
 stationDic_0 = {}
 
+# 1. Define quality flag mappings with target columns and initialize counters
+quality_mappings_T = {
+    'Tq': {
+        'targets': {
+            'T': {'null_count': 0},
+            'dSat': {'null_count': 0},
+            'IC': {'null_count': 0}
+        }
+    },
+    'Tnq': {
+        'targets': {
+            'Tn': {'null_count': 0}
+        }
+    },
+    'Txq': {
+        'targets': {
+            'Tx': {'null_count': 0}
+        }
+    }, 
+    'Tdq': {
+        'targets': {
+            'Td': {'null_count': 0}
+        }
+    },
+    'HRq': {
+        'targets': {
+            'HR': {'null_count': 0},
+            'dSat': {'null_count': 0},
+            'IC': {'null_count': 0}
+        }
+    }
+}
+
+quality_mappings_R = {
+    'Rs1q': {
+        'targets': {
+            'Rs1': {'null_count': 0}
+        }
+    },
+    'Rs3q': {
+        'targets': {
+            'Rs3': {'null_count': 0}
+        }
+    }, 
+    'R24q': {
+        'targets': {
+            'R24': {'null_count': 0}
+        }
+    },
+    'EEEq': {
+        'targets': {
+            'EEE': {'null_count': 0}
+        }
+    }    
+}
+
+quality_mappings_P = {
+    'P0q': {
+        'targets': {
+            'Pnmm': {'null_count': 0},
+            'dP3': {'null_count': 0},
+            'dP24': {'null_count': 0}
+        }
+    }    
+}
+
+quality_mappings_ff = {
+    'ffq': {
+        'targets': {
+            'ff': {'null_count': 0}
+        }
+    },
+    'fxq': {
+        'targets': {
+            'fx': {'null_count': 0}
+        }
+    }
+}
+
 try:
     with open('stationDic_1.txt') as f:
         data = f.read()
@@ -346,6 +425,30 @@ if st.button('Cargar los Datos'):
 
         st.session_state['temperature_df'] = st.session_state['filtered_df'][['OMM','EMA','Nombre','Prov','Reg','Fecha','T', 'Tq', 'Tn', 'Tnq', 'Tx', 'Txq','Td','Tdq','HR','HRq','dSat','IC','dT','dTf']]
 
+        # 3. Apply quality filters and count nulled values per target column
+        for q_flag, config in quality_mappings_T.items():
+            if q_flag in st.session_state['temperature_df'].columns:
+                bad_quality_mask = st.session_state['temperature_df'][q_flag] > 4
+                for target_col, target_config in config['targets'].items():
+                    if target_col in st.session_state['temperature_df'].columns:
+                        # Only count if we're actually nulling this column
+                        if bad_quality_mask.any():
+                            target_config['null_count'] = bad_quality_mask.sum()
+                            st.session_state['temperature_df'].loc[bad_quality_mask, target_col] = pd.NA
+
+        # 4. Prepare results for your function
+        nulled_counts = {
+            'T': quality_mappings_T['Tq']['targets']['T']['null_count'],
+            'Tn': quality_mappings_T['Tnq']['targets']['Tn']['null_count'],
+            'Tx': quality_mappings_T['Txq']['targets']['Tx']['null_count'],
+            'Td': quality_mappings_T['Tdq']['targets']['Td']['null_count'],
+            'HR': quality_mappings_T['HRq']['targets']['HR']['null_count'],
+            'dSat': (quality_mappings_T['Tq']['targets']['IC']['null_count'] + 
+                quality_mappings_T['HRq']['targets']['IC']['null_count']),            
+            'IC': (quality_mappings_T['Tq']['targets']['IC']['null_count'] + 
+                quality_mappings_T['HRq']['targets']['IC']['null_count'])
+            }
+
         if 'temperature_df' in st.session_state:
 
             with st.expander('Tabla de Temperaturas (°C), Humedad Relativa (%), Déficit de saturación (hPa) e IC (°C)'):
@@ -373,19 +476,12 @@ if st.button('Cargar los Datos'):
                     disabled=True
                 )
 
-                # Create the condition
-                condition = (st.session_state['temperature_df']['Tq'] > 4)
-                # Apply the nulling only where condition is True
-                st.session_state['temperature_df'].loc[condition, 'T'] = pd.NA
-                # Show how many values were nulled
-                nulled_count = condition.sum()
-
                 report = statistical_report(
                     df=st.session_state['temperature_df'],
                     var='T',
                     var_str='Temperatura',
                     unit_str='°C',
-                    nulled_count_var=nulled_count
+                    nulled_count_var=quality_mappings_T['Tq']['targets']['T']['null_count']
                 )
 
                 # Display nulled values info if exists
@@ -408,16 +504,12 @@ if st.button('Cargar los Datos'):
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
 
-                condition = (st.session_state['temperature_df']['Tnq'] > 4)
-                st.session_state['temperature_df'].loc[condition, 'Tn'] = pd.NA
-                nulled_count = condition.sum()
-
                 report = statistical_report(
                     df=st.session_state['temperature_df'],
                     var='Tn',
                     var_str='Temperatura Mínima',
                     unit_str='°C',
-                    nulled_count_var=nulled_count
+                    nulled_count_var=quality_mappings_T['Tnq']['targets']['Tn']['null_count']
                 )
 
                 if report['nulled_info']:
@@ -436,17 +528,13 @@ if st.button('Cargar los Datos'):
                         st.write(f"Máximo de {report['var_str']}: {max_value} {report['unit_str']} observado en:")
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
-
-                condition = (st.session_state['temperature_df']['Txq'] > 4)
-                st.session_state['temperature_df'].loc[condition, 'Tx'] = pd.NA
-                nulled_count = condition.sum()
 
                 report = statistical_report(
                     df=st.session_state['temperature_df'],
                     var='Tx',
                     var_str='Temperatura Máxima',
                     unit_str='°C',
-                    nulled_count_var=nulled_count
+                    nulled_count_var=quality_mappings_T['Txq']['targets']['Tx']['null_count']
                 )
 
                 if report['nulled_info']:
@@ -465,17 +553,13 @@ if st.button('Cargar los Datos'):
                         st.write(f"Máximo de {report['var_str']}: {max_value} {report['unit_str']} observado en:")
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
-
-                condition = (st.session_state['temperature_df']['Tdq'] > 4)
-                st.session_state['temperature_df'].loc[condition, 'Td'] = pd.NA
-                nulled_count_Td = condition.sum()
 
                 report = statistical_report(
                     df=st.session_state['temperature_df'],
                     var='Td',
                     var_str='Temperatura de Punto de Rocío',
                     unit_str='°C',
-                    nulled_count_var=nulled_count_Td
+                    nulled_count_var=quality_mappings_T['Tdq']['targets']['Td']['null_count']
                 )
 
                 if report['nulled_info']:
@@ -494,17 +578,13 @@ if st.button('Cargar los Datos'):
                         st.write(f"Máximo de {report['var_str']}: {max_value} {report['unit_str']} observado en:")
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
-
-                condition = (st.session_state['temperature_df']['HRq'] > 4)
-                st.session_state['temperature_df'].loc[condition, 'HR'] = pd.NA
-                nulled_count = condition.sum()
 
                 report = statistical_report(
                     df=st.session_state['temperature_df'],
                     var='HR',
                     var_str='Humedad Relativa',
                     unit_str='%',
-                    nulled_count_var=nulled_count
+                    nulled_count_var=quality_mappings_T['HRq']['targets']['HR']['null_count']
                 )
 
                 if report['nulled_info']:
@@ -523,17 +603,14 @@ if st.button('Cargar los Datos'):
                         st.write(f"Máximo de {report['var_str']}: {max_value} {report['unit_str']} observado en:")
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
-
-                condition = (st.session_state['temperature_df']['Tq'] > 4) | (st.session_state['temperature_df']['HRq'] > 4)
-                st.session_state['temperature_df'].loc[condition, 'dSat'] = pd.NA
-                nulled_count = condition.sum()
 
                 report = statistical_report(
                     df=st.session_state['temperature_df'],
                     var='dSat',
                     var_str='Déficit de Saturación',
                     unit_str='hPa',
-                    nulled_count_var=nulled_count
+                    nulled_count_var=quality_mappings_T['Tq']['targets']['dSat']['null_count'] + 
+                    quality_mappings_T['HRq']['targets']['dSat']['null_count']
                 )
 
                 if report['nulled_info']:
@@ -553,16 +630,13 @@ if st.button('Cargar los Datos'):
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
 
-                condition = (st.session_state['temperature_df']['Tq'] > 4) | (st.session_state['temperature_df']['HRq'] > 4)
-                st.session_state['temperature_df'].loc[condition, 'IC'] = pd.NA
-                nulled_count = condition.sum()
-
                 report = statistical_report(
                     df=st.session_state['temperature_df'],
                     var='IC',
                     var_str='Índice de Calor',
                     unit_str='°C',
-                    nulled_count_var=nulled_count
+                    nulled_count_var=quality_mappings_T['Tq']['targets']['IC']['null_count'] + 
+                    quality_mappings_T['HRq']['targets']['IC']['null_count']
                 )
 
                 if report['nulled_info']:
@@ -583,6 +657,25 @@ if st.button('Cargar los Datos'):
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
 
         st.session_state['rain_df'] = st.session_state['filtered_df'][['OMM','EMA','Nombre','Prov','Reg','Fecha','Rs3','Rs3T','Rs3q','Rs3P','Rs1','Rs1T','Rs1q','R24','R24T','R24q','EEE','EEEq']]
+
+        # 3. Apply quality filters and count nulled values per target column
+        for q_flag, config in quality_mappings_R.items():
+            if q_flag in st.session_state['rain_df'].columns:
+                bad_quality_mask = st.session_state['rain_df'][q_flag] > 4
+                for target_col, target_config in config['targets'].items():
+                    if target_col in st.session_state['rain_df'].columns:
+                        # Only count if we're actually nulling this column
+                        if bad_quality_mask.any():
+                            target_config['null_count'] = bad_quality_mask.sum()
+                            st.session_state['rain_df'].loc[bad_quality_mask, target_col] = pd.NA
+
+        # 4. Prepare results for your function
+        nulled_counts = {
+            'Rs1': quality_mappings_R['Rs1q']['targets']['Rs1']['null_count'],
+            'Rs3': quality_mappings_R['Rs3q']['targets']['Rs3']['null_count'],
+            'R24': quality_mappings_R['R24q']['targets']['R24']['null_count'],
+            'EEE': quality_mappings_R['EEEq']['targets']['EEE']['null_count']
+            }
 
         if 'rain_df' in st.session_state:
 
@@ -610,19 +703,12 @@ if st.button('Cargar los Datos'):
                     disabled=True
                 )
 
-                # Create the condition
-                condition = (st.session_state['rain_df']['Rs3q'] > 4)
-                # Apply the nulling only where condition is True
-                st.session_state['rain_df'].loc[condition, 'Rs3'] = pd.NA
-                # Show how many values were nulled
-                nulled_count = condition.sum()
-
                 report = statistical_report(
                     df=st.session_state['rain_df'],
                     var='Rs3',
                     var_str='Lluvia en 1(3) hora(s)',
                     unit_str='mm',
-                    nulled_count_var=nulled_count,
+                    nulled_count_var=quality_mappings_R['Rs3q']['targets']['Rs3']['null_count'],
                     find_min=False
                 )
 
@@ -635,17 +721,13 @@ if st.button('Cargar los Datos'):
                         st.write(f"Máximo de {report['var_str']}: {max_value} {report['unit_str']} observado en:")
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
-
-                condition = (st.session_state['rain_df']['Rs1q'] > 4)
-                st.session_state['rain_df'].loc[condition, 'Rs1'] = pd.NA
-                nulled_count = condition.sum()
 
                 report = statistical_report(
                     df=st.session_state['rain_df'],
                     var='Rs1',
                     var_str='Lluvia en 6 horas',
                     unit_str='mm',
-                    nulled_count_var=nulled_count,
+                    nulled_count_var=quality_mappings_R['Rs1q']['targets']['Rs1']['null_count'],
                     find_min=False
                 )
 
@@ -658,17 +740,13 @@ if st.button('Cargar los Datos'):
                         st.write(f"Máximo de {report['var_str']}: {max_value} {report['unit_str']} observado en:")
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
-
-                condition = (st.session_state['rain_df']['R24q'] > 4)
-                st.session_state['rain_df'].loc[condition, 'R24'] = pd.NA
-                nulled_count = condition.sum()
 
                 report = statistical_report(
                     df=st.session_state['rain_df'],
                     var='R24',
                     var_str='Lluvia en 24 horas',
                     unit_str='mm',
-                    nulled_count_var=nulled_count,
+                    nulled_count_var=quality_mappings_R['R24q']['targets']['R24']['null_count'],
                     find_min=False
                 )
 
@@ -682,16 +760,12 @@ if st.button('Cargar los Datos'):
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
 
-                condition = (st.session_state['rain_df']['EEEq'] > 4)
-                st.session_state['rain_df'].loc[condition, 'EEE'] = pd.NA
-                nulled_count = condition.sum()
-
                 report = statistical_report(
                     df=st.session_state['rain_df'],
                     var='EEE',
                     var_str='Evaporación',
                     unit_str='mm',
-                    nulled_count_var=nulled_count,
+                    nulled_count_var=quality_mappings_R['EEEq']['targets']['EEE']['null_count'],
                     find_min=False
                 )
 
@@ -706,6 +780,24 @@ if st.button('Cargar los Datos'):
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
 
         st.session_state['pressure_df'] = st.session_state['filtered_df'][['OMM','EMA','Nombre','Prov','Reg','Fecha','P0','P0q','Pnmm','hhh','aP3','dP3','dP24']]
+
+        # 3. Apply quality filters and count nulled values per target column
+        for q_flag, config in quality_mappings_P.items():
+            if q_flag in st.session_state['pressure_df'].columns:
+                bad_quality_mask = st.session_state['pressure_df'][q_flag] > 4
+                for target_col, target_config in config['targets'].items():
+                    if target_col in st.session_state['pressure_df'].columns:
+                        # Only count if we're actually nulling this column
+                        if bad_quality_mask.any():
+                            target_config['null_count'] = bad_quality_mask.sum()
+                            st.session_state['pressure_df'].loc[bad_quality_mask, target_col] = pd.NA
+
+        # 4. Prepare results for your function
+        nulled_counts = {
+            'Pnmm': quality_mappings_P['P0q']['targets']['Pnmm']['null_count'],
+            'dP3': quality_mappings_P['P0q']['targets']['dP3']['null_count'],
+            'dP24': quality_mappings_P['P0q']['targets']['dP24']['null_count']
+            }
 
         if 'pressure_df' in st.session_state:
 
@@ -737,19 +829,12 @@ if st.button('Cargar los Datos'):
                     disabled=True
                 )
 
-                # Create the condition
-                condition = (st.session_state['pressure_df']['P0q'] > 4)
-                # Apply the nulling only where condition is True
-                st.session_state['pressure_df'].loc[condition, 'Pnmm'] = pd.NA
-                # Show how many values were nulled
-                nulled_count = condition.sum()
-
                 report = statistical_report(
                     df=st.session_state['pressure_df'],
                     var='Pnmm',
                     var_str='Presión al nivel medio del mar',
                     unit_str='hPa',
-                    nulled_count_var=nulled_count
+                    nulled_count_var=quality_mappings_P['P0q']['targets']['Pnmm']['null_count']
                 )
 
                 # Display nulled values info if exists
@@ -771,20 +856,13 @@ if st.button('Cargar los Datos'):
                         st.write(f"Máximo de {report['var_str']}: {max_value} {report['unit_str']} observado en:")
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
-
-                # Create the condition
-                condition = (st.session_state['pressure_df']['P0q'] > 4)
-                # Apply the nulling only where condition is True
-                st.session_state['pressure_df'].loc[condition, 'dP3'] = pd.NA
-                # Show how many values were nulled
-                nulled_count = condition.sum()
 
                 report = statistical_report(
                     df=st.session_state['pressure_df'],
                     var='dP3',
                     var_str='Cambio de Presión en 3 Horas',
                     unit_str='hPa',
-                    nulled_count_var=nulled_count
+                    nulled_count_var=quality_mappings_P['P0q']['targets']['dP3']['null_count']
                 )
 
                 # Display nulled values info if exists
@@ -807,19 +885,12 @@ if st.button('Cargar los Datos'):
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
 
-                # Create the condition
-                condition = (st.session_state['pressure_df']['P0q'] > 4)
-                # Apply the nulling only where condition is True
-                st.session_state['pressure_df'].loc[condition, 'dP24'] = pd.NA
-                # Show how many values were nulled
-                nulled_count = condition.sum()
-
                 report = statistical_report(
                     df=st.session_state['pressure_df'],
                     var='dP24',
                     var_str='Cambio de Presión en 24 Horas',
                     unit_str='hPa',
-                    nulled_count_var=nulled_count
+                    nulled_count_var=quality_mappings_P['P0q']['targets']['dP24']['null_count']
                 )
 
                 # Display nulled values info if exists
@@ -843,6 +914,23 @@ if st.button('Cargar los Datos'):
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
 
         st.session_state['wind_df'] = st.session_state['filtered_df'][['OMM','EMA','Nombre','Prov','Reg','Fecha','ff','ffq','calma','dd','fx','fxq','fxdd','fxf']]
+
+        # 3. Apply quality filters and count nulled values per target column
+        for q_flag, config in quality_mappings_ff.items():
+            if q_flag in st.session_state['wind_df'].columns:
+                bad_quality_mask = st.session_state['wind_df'][q_flag] > 4
+                for target_col, target_config in config['targets'].items():
+                    if target_col in st.session_state['wind_df'].columns:
+                        # Only count if we're actually nulling this column
+                        if bad_quality_mask.any():
+                            target_config['null_count'] = bad_quality_mask.sum()
+                            st.session_state['wind_df'].loc[bad_quality_mask, target_col] = pd.NA
+
+        # 4. Prepare results for your function
+        nulled_counts = {
+            'ff': quality_mappings_ff['ffq']['targets']['ff']['null_count'],
+            'fx': quality_mappings_ff['fxq']['targets']['fx']['null_count']
+            }
 
         if 'wind_df' in st.session_state:
 
@@ -870,19 +958,12 @@ if st.button('Cargar los Datos'):
                     disabled=True
                 )
 
-                # Create the condition
-                condition = (st.session_state['wind_df']['ffq'] > 4)
-                # Apply the nulling only where condition is True
-                st.session_state['wind_df'].loc[condition, 'ff'] = pd.NA
-                # Show how many values were nulled
-                nulled_count = condition.sum()
-
                 report = statistical_report(
                     df=st.session_state['wind_df'],
                     var='ff',
                     var_str='Velocidad del viento',
                     unit_str='km/h',
-                    nulled_count_var=nulled_count,
+                    nulled_count_var=quality_mappings_ff['ffq']['targets']['ff']['null_count'],
                     find_min=False
                 )
 
@@ -898,19 +979,12 @@ if st.button('Cargar los Datos'):
                         for station, date in max_stations_dates:
                             st.write(f" - {station} el {date.strftime('%Y-%m-%d %H:%M')}")
 
-                # Create the condition
-                condition = (st.session_state['wind_df']['fxq'] > 4)
-                # Apply the nulling only where condition is True
-                st.session_state['wind_df'].loc[condition, 'fx'] = pd.NA
-                # Show how many values were nulled
-                nulled_count = condition.sum()
-
                 report = statistical_report(
                     df=st.session_state['wind_df'],
                     var='fx',
                     var_str='Racha máxima del viento',
                     unit_str='km/h',
-                    nulled_count_var=nulled_count,
+                    nulled_count_var=quality_mappings_ff['fxq']['targets']['fx']['null_count'],
                     find_min=False
                 )
 
