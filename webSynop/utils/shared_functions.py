@@ -1,7 +1,7 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
-from .database import database_cursor
+from .database import run_query
 
 # Function to convert degrees to compass directions
 def degrees_to_direction(degrees, num_sectors=16):
@@ -17,13 +17,11 @@ def degrees_to_direction(degrees, num_sectors=16):
 # Function to find out the max date-time from DB
 def get_max_observation_time():
     try:
-        with database_cursor() as cursor:
-            cursor.execute("SELECT MAX(obs_time) AS max_datetime FROM Observations")
-            result = cursor.fetchone()
-            if result and result[0]:  # Check both result existence and value
-                return result[0]
-            st.warning("No se encontraron registros en la tabla Observations")
-            return None
+        results = run_query("SELECT MAX(obs_time) AS max_datetime FROM Observations")
+        if results and results[0]:  # Check both result existence and value
+            return results[0][0]
+        st.warning("No se encontraron registros en la tabla Observations")
+        return None
     except Exception as e:
         st.error(f"No se pudo hallar la fecha-hora de observación máxima: {str(e)}")
         return None

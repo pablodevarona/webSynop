@@ -9,7 +9,7 @@ import ast
 from utils.shared_functions import degrees_to_direction
 from utils.shared_functions import get_max_observation_time
 from utils.shared_functions import statistical_report
-from utils.database import managed_database_connection
+from utils.database import run_query, get_connection
 
 st.set_page_config(layout="wide")
 
@@ -146,7 +146,7 @@ ORDER BY Observations.station_id
 
 if st.button('Cargar los Datos'):
     try:
-        with managed_database_connection() as conn:
+        with get_connection() as conn:
             st.session_state['obs_df'] = pd.read_sql(
                 query, 
                 conn, 

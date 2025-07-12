@@ -6,7 +6,7 @@ import sys
 import ast
 from utils.shared_functions import degrees_to_direction
 from utils.shared_functions import get_max_observation_time
-from utils.database import managed_database_connection
+from utils.database import get_connection, run_query
 from utils.shared_functions import statistical_report
 from utils.shared_functions import generate_quality_report, display_quality_report
 from utils.shared_functions import filter_specific_hours
@@ -180,7 +180,7 @@ ORDER BY Observations.station_id, Observations.obs_time DESC
 """
 if st.button('Cargar los Datos'):
     try:
-        with managed_database_connection() as conn:
+        with get_connection() as conn:
             st.session_state['filtered_df'] = pd.read_sql(
                 query, 
                 conn, 

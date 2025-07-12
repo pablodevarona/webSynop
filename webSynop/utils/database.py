@@ -23,26 +23,9 @@ def get_connection():
         st.error('Error de configuración - compruebe el fichero secrets.toml')
         logging.exception(e)
         return None
-
-@contextmanager
-def managed_database_connection():
-    """Context manager for database connection"""
-    conn = None
-    try:
-        conn = get_connection()
-        yield conn
-    except Exception as e:
-        st.error(f"Error de conexión a la base de datos: {str(e)}")
-
-@contextmanager
-def database_cursor():
-    """Context manager for safe cursor operations"""
-    conn = get_connection()
-    cursor = None
-    try:
-        cursor = conn.cursor()
-        yield cursor
-        conn.commit()  # Commit if no errors
-    except Exception as e:
-        conn.rollback()
-        st.error(f"Error de la base de datos: {str(e)}")
+    
+@st.cache_data(ttl=600)
+def run_query(query, *params):
+    with get_connection().cursor() as cur:
+        cur.execute(query, params)
+        return cur.fetchall()
