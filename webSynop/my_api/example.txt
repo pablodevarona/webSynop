@@ -1,0 +1,59 @@
+🧪 Ejemplo de solicitud
+
+POST /api/observation/
+
+{
+  "obs_date": "2025-07-01T07:00:00"
+}
+
+📤 Ejemplo de respuesta
+
+[
+  {
+    "station_id": "001",
+    "station_name": "Varadero",
+    "aws": true,
+    "obs_time": "2025-07-01T07:00:00",
+    "temperature": {
+      "quality": "Válido (sin control estadístico)",
+      "value": 27.1,
+      "unit": "°C"
+    },
+    "relative_humidity": {
+      "quality": "Válido (sin control estadístico)",
+      "value": 85,
+      "unit": "%"
+    },
+    "pressure": {
+      "quality": "Válido (sin control estadístico)",
+      "value": 1017.9,
+      "unit": "hPa"
+    },
+    "wind": {
+      "speed": {
+        "quality": "Válido (sin control estadístico)",
+        "value": 14.4,
+        "unit": "km/h"
+      },
+      "direction": {
+        "value": "E",
+        "calm": false
+      }
+    },
+    "rain": {
+      "rain_s3": {
+        "value": 0,
+        "quality": "Válido (sin control estadístico)"
+      },
+      "rain_24h": {
+        "value": 1.6,
+        "quality": "Válido (sin control estadístico)"
+      },
+      "unit": "mm"
+    }
+  }
+]
+
+🖥️ Cómo ejecutar
+
+uvicorn main:app --reload
